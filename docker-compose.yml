@@ -1,0 +1,81 @@
+services:
+### Bitcoind ###
+  bitcoin:
+    image: kylemanna/bitcoind
+    restart: always
+    container_name: bitcoind-node
+    volumes:
+      - ./bitcoin.conf:/bitcoin/.bitcoin/bitcoin.conf
+      - ./bitcoin-data:/bitcoin/.bitcoin  
+    ports:
+      - 8333:8333   #p2p network
+      - 8332:8332   #rpc
+
+### Electrs ###
+  electrs:
+    image: amd64/ubuntu:latest
+    restart: always
+    container_name: electrs
+    volumes:
+      - ./bitcoin-data:/bitcoin/.bitcoin
+      - ./electrs-data:/electrs
+    ports:
+      - 50001:50001 #electrs
+    working_dir: /electrs
+    entrypoint: ["./electrs"]
+    depends_on:
+      - bitcoin
+
+### Mempool.space ###
+  mempool-web:
+    depends_on:
+      - mempool-api
+    environment:
+      FRONTEND_HTTP_PORT: "8080"
+      BACKEND_MAINNET_HTTP_HOST: "mempool-api"
+    image: mempool/frontend:latest
+    user: "1000:1000"
+    restart: on-failure
+    stop_grace_period: 1m
+    command: "./wait-for mempool-db:3306 --timeout=720 -- nginx -g 'daemon off;'"
+    ports:
+      - 80:8080
+  mempool-api:
+    depends_on:
+      - electrs
+      - mempool-db
+    environment:
+      MEMPOOL_BACKEND: "electrum"
+      ELECTRUM_HOST: "host.docker.internal"
+      ELECTRUM_PORT: "50001"
+      ELECTRUM_TLS_ENABLED: "false"
+      MEMPOOL_NETWORK: "regtest"
+      CORE_RPC_HOST: "host.docker.internal"
+      CORE_RPC_PORT: "8332"
+      CORE_RPC_USERNAME: "regtest"
+      CORE_RPC_PASSWORD: "regtest"
+      DATABASE_ENABLED: "true"
+      DATABASE_HOST: "mempool-db"
+      DATABASE_DATABASE: "mempool"
+      DATABASE_USERNAME: "mempool"
+      DATABASE_PASSWORD: "mempool"
+      STATISTICS_ENABLED: "true"
+    image: mempool/backend:latest
+    user: "1000:1000"
+    restart: on-failure
+    stop_grace_period: 1m
+    command: "./wait-for-it.sh mempool-db:3306 --timeout=720 --strict -- ./start.sh"
+    volumes:
+      - ./data:/backend/cache
+  mempool-db:
+    environment:
+      MYSQL_DATABASE: "mempool"
+      MYSQL_USER: "mempool"
+      MYSQL_PASSWORD: "mempool"
+      MYSQL_ROOT_PASSWORD: "admin"
+    image: mariadb:10.5.21
+    user: "1000:1000"
+    restart: on-failure
+    stop_grace_period: 1m
+    volumes:
+      - ./mysql/data:/var/lib/mysql

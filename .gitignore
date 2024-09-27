@@ -1,0 +1,6 @@
+#Folders generated with containers start
+bitcoin-data
+electrs-data/db
+data
+mqsql
+.DS_Store
