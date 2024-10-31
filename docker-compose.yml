@@ -1,6 +1,7 @@
 services:
 ### Bitcoind ###
   bitcoin:
+    platform: linux/x86_64
     image: kylemanna/bitcoind
     restart: always
     container_name: bitcoind-node
@@ -13,6 +14,7 @@ services:
 
 ### Electrs ###
   electrs:
+    platform: linux/x86_64
     image: amd64/ubuntu:latest
     restart: always
     container_name: electrs
